@@ -1,142 +1,302 @@
-# Voltway — EV Charging Station Finder & Slot Booking
+<div align="center">
 
-A responsive dark/orange liquid-glass application for AWT and Software Engineering. Built with Node.js, Express, MongoDB/Mongoose, server-side sessions, Bootstrap, vanilla JavaScript and Leaflet.
+# ⚡ VOLTWAY
 
-## Implemented
+### EV Charging Station Finder & Slot Booking
 
-- Customer registration/login, profile, vehicles and ownership checks.
-- City/address search, connector and power filters, time availability, map markers, optional geolocation and distance sorting.
-- Time-zone aware reservation slots, atomic MongoDB block claims, five-minute payment holds, saved price/station/vehicle snapshots.
-- Simulated success/failure payments with idempotency, booking confirmation/history, cancellation and single simulated refunds.
-- Completed-booking reviews and in-app customer/admin notifications.
-- Admin station/charger management, customer activation, permitted session transitions, dashboard, filtered reports and CSV exports.
-- CSRF protection, bcrypt hashing, login rate limits, session regeneration, MongoDB session storage, security headers and server-side validation.
+**Find your charger. Reserve your time. Keep moving.**
 
-**Demo payment — no real money will be charged.** The application does not control charging hardware or receive live telemetry. Seed stations are fictional demonstration records.
+![Node.js](https://img.shields.io/badge/Node.js-22%2B-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
+![Express](https://img.shields.io/badge/Express.js-5-202020?style=for-the-badge&logo=express&logoColor=white)
+![MongoDB Atlas](https://img.shields.io/badge/MongoDB-Atlas-47A248?style=for-the-badge&logo=mongodb&logoColor=white)
+![Mongoose](https://img.shields.io/badge/Mongoose-8-880000?style=for-the-badge&logo=mongoose&logoColor=white)
 
-## Run with persistent MongoDB
+![JavaScript](https://img.shields.io/badge/JavaScript-ES_Modules-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
+![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)
+![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge&logo=css&logoColor=white)
+![Bootstrap](https://img.shields.io/badge/Bootstrap-5-7952B3?style=for-the-badge&logo=bootstrap&logoColor=white)
+![Leaflet](https://img.shields.io/badge/Leaflet-Maps-199900?style=for-the-badge&logo=leaflet&logoColor=white)
 
-### This PC: Atlas is configured
+A full-stack academic project with a **dark & orange glass interface**, map-based station discovery, transactional reservations, simulated payments, and an admin workspace.
 
-The existing project folder has a private `.env` configured for the `ev_charging` database. No local MongoDB installation is required. Connectivity and all 37 API routes were verified against Atlas on 10 October 2026: **13 test groups passed, zero failures**. The six demonstration stations and twelve chargers have been seeded in the application database.
+[Features](#-features) · [Quick Start](#-quick-start) · [Tech Stack](#-tech-stack) · [Testing](#-testing) · [Documentation](#-documentation)
 
-```powershell
-cd "C:\Users\ADMIN\OneDrive\Documents\ChatGPT\ev charging\project"
-npm run db:check
-npm start
+</div>
+
+---
+
+## 🖼️ Project Preview
+
+![Voltway station finder — desktop interface](docs/screenshots/station-finder-desktop.png)
+
+<details>
+<summary><strong>View booking confirmation, admin dashboard and mobile preview</strong></summary>
+
+### Booking confirmation
+
+![Saved booking confirmation](docs/screenshots/booking-confirmed.png)
+
+### Admin dashboard
+
+![Admin dashboard](docs/screenshots/admin-dashboard.png)
+
+### Mobile experience
+
+<img src="docs/screenshots/station-finder-mobile.png" alt="Voltway mobile station finder" width="320">
+
+</details>
+
+_Screenshots show the earlier isolated demo. Vehicle selection and shared glass styling have since been updated._
+
+## ✨ Features
+
+| For drivers                                       | For administrators                             |
+| ------------------------------------------------- | ---------------------------------------------- |
+| Search stations by city or area                   | Add and edit stations and chargers             |
+| Filter connectors, power and time availability    | Manage operating status and hourly pricing     |
+| Explore stations on a Leaflet map                 | Inspect bookings and advance session status    |
+| Save vehicles and find compatible chargers        | Activate or deactivate customer accounts       |
+| Reserve charging time with a temporary hold       | View simulated payments and refunds            |
+| Simulate payment success or failure               | Track booking and payment statistics           |
+| View booking history and cancel eligible sessions | Filter reports and export CSV                  |
+| Review completed sessions and read notifications  | Receive booking and cancellation notifications |
+
+### Built for reliable reservations
+
+- **Atomic time-block claims** prevent overlapping reservations, including concurrent requests.
+- **Five-minute payment holds** expire without depending on background cleanup timing.
+- **Saved price, station and vehicle snapshots** preserve booking history when records change.
+- **Idempotent payments and refunds** prevent duplicate successful records.
+- **Explicit page routes** validate record IDs, enforce access guards and handle invalid links.
+- **Responsive glass surfaces** span customer and admin pages, with a solid-background fallback.
+
+> **Demo payment — no real money will be charged.** Stations supplied by the seed script are demonstration records. This project does not control physical chargers or receive live telemetry.
+
+## 🧰 Tech Stack
+
+| Layer                 | Technology                                         | Purpose                                               |
+| --------------------- | -------------------------------------------------- | ----------------------------------------------------- |
+| Frontend              | HTML5, CSS3, JavaScript ES modules                 | Pages, glass styling and browser interactions         |
+| Responsive layout     | Bootstrap 5                                        | Layout utilities and components                       |
+| Backend               | Node.js 22+, Express 5                             | HTTP APIs, middleware and application lifecycle       |
+| Database              | MongoDB Atlas, Mongoose 8                          | Persistent records, schemas, indexes and transactions |
+| Authentication        | express-session, connect-mongo, bcryptjs           | Server-side sessions and password hashing             |
+| Validation & security | Zod, Helmet, express-rate-limit                    | Request validation, security headers and throttling   |
+| Maps                  | Leaflet, OpenStreetMap tiles                       | Station markers and interactive maps                  |
+| Dates & time zones    | Luxon                                              | UTC storage and station-local booking times           |
+| Testing               | Node test runner, Supertest, mongodb-memory-server | API, concurrency and frontend-logic checks            |
+| Formatting            | Prettier                                           | Consistent source formatting                          |
+
+## 🚀 Quick Start
+
+### 1. Clone and install
+
+```bash
+ git clone https://github.com/tirthgandhi/ev-charging-station-finder.git
+ cd ev-charging-station-finder
+ npm install
 ```
 
-Open [localhost:3000](http://localhost:3000). The server listens only on `127.0.0.1` by default, so it is not exposed to your local network. The administrator email is `admin@voltway.local`; its randomly generated password is stored only as `ADMIN_PASSWORD` in the private `.env`. The temporary-preview password does not apply to this Atlas account. Register a separate customer through the interface to test customer features.
+Requires **Node.js 22+**. For persistent storage, use **MongoDB Atlas** or a local MongoDB **replica set**. Standalone MongoDB does not support the transactions used for reservations.
 
-The final ZIP intentionally excludes `.env`, `.git`, `node_modules` and raw test output. Your configured `.env` remains in the existing project folder. On a different PC, install dependencies and configure a new private `.env` using the generic instructions below.
+### 2. Choose how to run
 
-### New installation
+<details open>
+<summary><strong>Option A — Persistent Atlas database</strong></summary>
 
-Requires Node.js 22+ and MongoDB Atlas (or a local MongoDB replica set). Standalone MongoDB cannot support the transactional booking guarantees.
+Copy `.env.example` to `.env`:
 
 ```powershell
-npm install
+# Windows PowerShell
 Copy-Item .env.example .env
-# Edit .env with your MongoDB URI, a random SESSION_SECRET,
-# ADMIN_EMAIL and a strong ADMIN_PASSWORD.
+```
+
+```bash
+# macOS / Linux
+cp .env.example .env
+```
+
+Set these values in your private `.env`:
+
+| Variable         | Value                                                |
+| ---------------- | ---------------------------------------------------- |
+| `MONGODB_URI`    | Your database connection string with a database name |
+| `SESSION_SECRET` | A random secret of at least 32 characters            |
+| `ADMIN_EMAIL`    | Your administrator email                             |
+| `ADMIN_PASSWORD` | A strong password of at least 12 characters          |
+| `APP_BASE_URL`   | `http://localhost:3000` for local development        |
+| `HOST`           | `127.0.0.1` for access from this PC only             |
+
+Generate a session secret:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+Check the connection, create sample records, and start:
+
+```bash
+npm run db:check
 npm run seed
 npm start
 ```
 
-Open [localhost:3000](http://localhost:3000). The seed command creates six sample stations, twelve chargers and a controlled admin account. It preserves existing records and does not reset an existing admin password. Public registration always creates customers. Keep `.env` private; never commit credentials.
+Open **[localhost:3000](http://localhost:3000)**. Sign in using the administrator credentials you configured, or register a customer through the interface.
 
-Generate a session secret with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` and paste it into your private `.env`.
+The seed script creates **six sample stations and twelve chargers**. It preserves existing records and does not reset an existing administrator's password. Public registration always creates customer accounts.
 
-## Try the isolated demo
+**Already configured locally?** Keep your existing `.env`; run `npm run db:check` followed by `npm start`.
 
-```powershell
+</details>
+
+<details>
+<summary><strong>Option B — Temporary demo without installing MongoDB manually</strong></summary>
+
+```bash
 npm run preview
 ```
 
-This starts a temporary local MongoDB replica set and the application at [localhost:3000](http://localhost:3000). The first run downloads MongoDB from its official distribution. The temporary database is deleted when stopped; use the persistent setup above for real project records.
+The first run downloads the MongoDB test binary and starts an isolated local replica set. Open **[localhost:3000](http://localhost:3000)**.
 
-Demo-only administrator: `admin@voltway.demo` / `Voltway-Demo-2026`. These credentials apply only to the isolated preview. Do not deploy the preview script.
+| Demo login | Value                |
+| ---------- | -------------------- |
+| Email      | `admin@voltway.demo` |
+| Password   | `Voltway-Demo-2026`  |
 
-## Validation
+These credentials apply **only to the isolated demo**. Its database is deleted when stopped. Use Option A for persistent records; do not deploy the preview script.
 
-```powershell
-npm test
-npm run test:atlas
-npm run privacy:check
-npm run format:check
+</details>
+
+## 🔄 Booking Flow
+
+```mermaid
+flowchart LR
+    A[Find station] --> B[Select vehicle & charger]
+    B --> C[Choose date & start time]
+    C --> D[Create temporary hold]
+    D --> E[Review booking]
+    E --> F[Simulate payment]
+    F --> G[Saved confirmation]
+    G --> H[Admin completes session]
+    H --> I[Customer review]
 ```
 
-Tests use a real temporary MongoDB replica set, not a mocked database. They exercise authentication, CSRF, authorization, concurrent booking conflicts, rollback, adjacent periods, expired holds, payment retries, cancellation/refund idempotency, reviews, reports and session persistence. See [test cases](docs/test-cases.md) for results and browser checks.
+All active saved vehicles remain visible. The app prefers the newly saved vehicle and selects a compatible operational charger when available. Connector mismatches are explained, and incompatible reservations are blocked by both frontend and backend.
 
-`npm run test:atlas` uses the private connection to create a randomly named disposable `voltway_test_…` database. It refuses existing databases, exercises all 37 declared endpoints and removes only its own test database afterward. It never runs test fixtures against `ev_charging`. The database user needs permission to create and remove this isolated test database. `npm test` continues to use a temporary local MongoDB replica set instead.
+**Select a green start-time button before booking.** The selected slot turns orange. Continue guides you back to the slot picker if no time is selected.
 
-`npm run privacy:check` scans deliverable source for the configured URI, database username/password/host, session secret and admin password without printing those values. The API tests also verify that `.env`, `.git/config` and backend source cannot be downloaded through the web server. See [Atlas verification](docs/atlas-verification.md) for the endpoint results.
+| Policy                | Default behavior                                         |
+| --------------------- | -------------------------------------------------------- |
+| Reservation interval  | 30-minute blocks                                         |
+| Booking horizon       | Up to 30 days ahead                                      |
+| Payment hold          | Five minutes                                             |
+| Price                 | Hourly rate × reserved duration; stored in integer paise |
+| Customer cancellation | Before the session starts                                |
+| Refund                | Full simulated refund for eligible paid cancellations    |
+| Reviews               | One per completed booking                                |
+| Completion            | Admin: confirmed → in progress → completed               |
 
-### Privacy and credential handling
+Block size, horizon and hold duration are configurable. Timestamps are stored in UTC and displayed in the station's time zone. Each station has one daily operating window; overnight windows are not supported. Report date filters use UTC; the dashboard's today count uses Asia/Kolkata.
 
-- Credentials stay in `.env`, which is Git-ignored and omitted from the ZIP. The README, browser assets and verification report contain no connection credentials.
-- Source updates are maintained on the `codex/voltway-implementation` branch. Credentials remain local and are never included in Git commits. A private `.env` does not make a GitHub repository private; repository visibility is managed separately in GitHub settings.
-- This workspace is inside your OneDrive Documents folder. If OneDrive sync is enabled, `.env` may sync with that folder; Git ignore rules do not control OneDrive. Store the project outside OneDrive if you require device-only storage.
-- The database password was shared in chat. Rotate it in Atlas after verification and update only your local `.env`; no password is repeated in this documentation.
+## 🧪 Testing
 
-## Source structure
+| Command                              | What it checks                                                               |
+| ------------------------------------ | ---------------------------------------------------------------------------- |
+| `npm test`                           | Integration tests on a temporary local replica set plus frontend logic tests |
+| `npm run test:atlas`                 | APIs against an isolated disposable Atlas test database                      |
+| `node --test tests/frontend.test.js` | Vehicle selection and client route resolution                                |
+| `npm run privacy:check`              | Deliverable source for configured private values                             |
+| `npm run format:check`               | Source formatting                                                            |
+
+**Recorded verification:** 13 Atlas integration test groups passed, all 37 declared API endpoints returned successful responses, and seven vehicle-selection/route checks passed. These are recorded results, not a live CI status. See [test cases](docs/test-cases.md) and [endpoint verification](docs/atlas-verification.md) for scope and limitations.
+
+The Atlas test runner creates a uniquely named `voltway_test_…` database, refuses an existing test database, and removes only the database it created. It does not use your application records as fixtures. The database user must have permission to create and remove that test database.
+
+## 🔐 Security & Privacy
+
+- Passwords are hashed; sessions are stored in MongoDB and regenerated after login.
+- Cookie-authenticated changes require a CSRF token. Private records require ownership checks; admin APIs require an active admin.
+- Login throttling, validated inputs, permitted update fields and escaped user content protect API and UI boundaries.
+- `.env` is Git-ignored and excluded from generated project ZIPs. Never commit database credentials, session secrets or administrator passwords.
+- Git ignore rules do not prevent cloud-folder syncing. Keep private configuration outside synced folders if device-only storage is required.
+- A private environment file does not change GitHub repository visibility. Rotate credentials if they have been shared or exposed.
+
+## 📁 Project Structure
 
 ```text
-src/
-  app.js                 HTTP API, middleware and authorization
-  server.js              configuration, connection and process lifecycle
-  config.js              environment validation
-  validation.js          explicit request schemas
-  models/index.js        collections and indexes
-  services/booking.js    transactional reservation/payment/cancellation logic
-public/
-  index.html             application shell
-  assets/app.js          customer screens and routing
-  assets/admin.js        admin screens
-  assets/api.js          API client and safe presentation helpers
-  assets/style.css       responsive liquid-glass visual system
-scripts/                 controlled seed and isolated preview
-tests/                   database-backed integration tests
-docs/                    requirements, architecture, APIs, diagrams and test evidence
+ev-charging-station-finder/
+├── public/
+│   ├── index.html                 # Application shell
+│   └── assets/
+│       ├── app.js                 # Customer screens
+│       ├── admin.js               # Admin workspace
+│       ├── routes.js              # Explicit page route registry
+│       ├── booking-selection.js   # Vehicle/charger matching
+│       ├── api.js                 # API client and safe display helpers
+│       └── style.css              # Responsive glass design
+├── src/
+│   ├── app.js                     # APIs, middleware and authorization
+│   ├── server.js                  # Startup and shutdown
+│   ├── config.js                  # Environment configuration
+│   ├── validation.js              # Request schemas
+│   ├── models/index.js            # Collections and indexes
+│   └── services/booking.js        # Transactional booking logic
+├── scripts/                       # Seed, preview, Atlas checks and packaging
+├── tests/                         # Integration and frontend logic tests
+├── docs/                          # API, diagrams, screenshots and test evidence
+├── .env.example                   # Placeholder configuration only
+└── package.json
 ```
 
-## Booking policies
+## 📚 Documentation
 
-### Vehicle selection, page routes and glass styling
+| Guide                                              | Contents                                             |
+| -------------------------------------------------- | ---------------------------------------------------- |
+| [Requirements](docs/requirements.md)               | Objectives, actors, scope and limitations            |
+| [Implementation plan](docs/implementation-plan.md) | Backend-first development parts                      |
+| [Database design](docs/database-design.md)         | Collections, relationships, indexes and transactions |
+| [API reference](docs/api.md)                       | Endpoints, request fields and access rules           |
+| [Page routes](docs/routes.md)                      | Customer/admin routes and navigation behavior        |
+| [SE diagrams](docs/diagrams.md)                    | Use cases, activities, sequences, classes and DFDs   |
+| [Test cases](docs/test-cases.md)                   | Checks, results and browser evidence                 |
+| [Atlas verification](docs/atlas-verification.md)   | API coverage and verification limits                 |
 
-Booking now shows every active vehicle owned by the signed-in customer, including vehicles whose connector does not match the current charger. Newly saved vehicles are preselected and a compatible operational charger is chosen automatically when available. Connector mismatches are explained visibly, and incompatible bookings remain blocked by both client and server. Returning from Add vehicle reloads saved records.
+## ☁️ Deployment
 
-Customer and admin routes have an explicit route registry with record-ID validation, authentication/role guards and a Page not found state. See [route contract](docs/routes.md). Shared glass surfaces cover the finder, booking, vehicles, profile, authentication, notifications and admin pages, with a solid-background fallback for unsupported browsers.
+Use a Node.js host, MongoDB Atlas and HTTPS. Configure `NODE_ENV=production`, `MONGODB_URI`, `SESSION_SECRET`, `APP_BASE_URL`, `HOST` and `PORT` in the hosting environment.
 
-Run `node --test tests/frontend.test.js` for the seven vehicle-selection and route-registry regression checks.
+```bash
+npm ci --omit=dev
+npm start
+```
 
-### Map troubleshooting
+- The app assumes **one trusted reverse-proxy hop**. Match the host's proxy configuration.
+- Keep `HOST=127.0.0.1` behind a same-machine reverse proxy; use your provider's required bind address for container hosting.
+- `GET /api/health` returns 200 while MongoDB is connected.
+- Preserve the session secret across restarts; configure database backups, restricted network access and host logging.
+- Holds are cleaned up every 30 seconds. Availability and payment checks also enforce expiry directly.
+- Seed from a controlled environment, then remove seed-only admin variables from the deployed runtime.
 
-The map uses the canonical `https://tile.openstreetmap.org/{z}/{x}/{y}.png` endpoint with visible attribution and `strict-origin-when-cross-origin` referrer policy. Cross-origin tile requests send the app origin, not private route details. After updating the map fix, restart the Node server and reload the page so the new response headers apply. Tile errors show a readable fallback and an OpenStreetMap link; station search and booking remain usable. Network/provider restrictions can still prevent tiles loading. Do not disable security globally or proxy around provider blocks.
+**Public hosting is not provisioned by this repository.**
 
-Default intervals are 30 minutes, the horizon is 30 days and payment holds last five minutes. Environment variables configure these values. Prices are integer paise, computed by the backend and saved at reservation time. Timestamps are stored in UTC; booking screens use the station time zone. Search datetime filters use the browser's local zone and send UTC. Report date boundaries use UTC; the dashboard's today count uses Asia/Kolkata.
+<details>
+<summary><strong>Map troubleshooting</strong></summary>
 
-Availability starts at the first aligned block within opening hours. The initial version supports a single daily opening window and no overnight window. A customer can cancel pending/confirmed bookings before their start; paid cancellations produce a full simulated refund. Only the admin can mark confirmed → in progress → completed, including early transitions for classroom demonstrations. Completed bookings accept one review each.
+Tiles use the canonical OpenStreetMap endpoint, visible attribution and `strict-origin-when-cross-origin` referrer policy. Restart the Node server after response-header changes, then reload the page. If tiles cannot load, a fallback message and OpenStreetMap link appear; station addresses and bookings remain usable.
 
-## Deployment
+Choose a tile provider suitable for expected deployment traffic and update the CSP allowlist if changing providers. Respect provider usage policies; do not proxy around access blocks.
 
-Use a Node.js host, Atlas connectivity and HTTPS. Set `NODE_ENV=production`, `MONGODB_URI`, `SESSION_SECRET`, `APP_BASE_URL=https://your-host`, and `PORT`. Configure exactly one trusted reverse proxy hop (as assumed by this app), restricted database network access and a least-privilege database user. Run `npm ci --omit=dev`, then `npm start`. Seed from a controlled environment before removing seed-only admin variables from the runtime.
+</details>
 
-Set `HOST` explicitly when deploying. Keep `127.0.0.1` when a reverse proxy on the same machine serves the app; use the bind address required by the hosting provider for container deployments.
+## 🌱 Future Scope
 
-`GET /api/health` returns 200 only while MongoDB is connected. An in-process cleanup job expires holds every 30 seconds; availability and payment checks also compare expiry timestamps and do not depend on cleanup timing. For hosts that suspend processes, schedule equivalent cleanup when running; booking correctness remains protected by timestamp checks and transactional claims.
+Live charger telemetry · Operator accounts · QR check-in · Real payment integration · Email/SMS updates · Measured energy billing · Route planning
 
-Sessions are stored in MongoDB, cookies are HTTP-only/SameSite and secure in production. Preserve the session secret across restarts. Configure host log collection, alerting and database backups. OpenStreetMap tiles include attribution; select a tile service suitable for production traffic and update the CSP allowlist if changing providers.
+---
 
-Atlas connectivity is configured and verified in the private local environment. Public hosting has not been provisioned. No real credentials are included in repository source or the final ZIP.
+<div align="center">
 
-## Academic documentation
+**Built for Advanced Web Technology & Software Engineering**
+⚡ Less waiting. More moving.
 
-- [Implementation parts](docs/implementation-plan.md)
-- [Requirements and limitations](docs/requirements.md)
-- [Database design](docs/database-design.md)
-- [API reference](docs/api.md)
-- [Architecture and SE diagrams](docs/diagrams.md)
-- [Test cases and results](docs/test-cases.md)
-
-Future extensions include operator accounts, hardware telemetry, QR check-in, real payment integration, notifications by email/SMS and measured energy billing.
+</div>
