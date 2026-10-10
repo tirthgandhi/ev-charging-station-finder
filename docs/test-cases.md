@@ -16,9 +16,15 @@ Run `npm test` to recreate a temporary MongoDB replica set and test the actual E
 | Full scenario           | confirmation, admin start/complete, review eligibility and uniqueness, notification creation                                  | Passed |
 | Search/reporting        | city/connector/power search, occupied availability, filtered reports and CSV totals                                           | Passed |
 
-Final execution: **nine integration tests passed, zero failures**. Test groups contain multiple assertions. The expanded checks cover persisted records and MongoDB sessions across a fresh application instance, zero-length periods, booking horizon, inactive stations, incompatible vehicles, malformed identifiers and forbidden status transitions. `npm run format:check` also passed. Dependency installation reported zero known vulnerabilities.
+Final Atlas execution on 10 October 2026: **13 integration test groups passed, zero failures; all 37 declared API endpoints produced successful responses**. The same expanded suite also passed against a local replica set. The checks cover persisted records and MongoDB sessions across a fresh application instance, zero-length periods, booking horizon, inactive stations, incompatible vehicles, malformed identifiers, forbidden status transitions, all customer/admin read/update routes, rate limiting and private-file access denial. Test groups contain multiple assertions. See [the endpoint verification report](atlas-verification.md). Dependency installation previously reported zero known vulnerabilities.
 
 ## Browser verification
+
+## Vehicle and route regression update
+
+After correcting hidden vehicles and introducing the explicit client route registry, all seven focused frontend logic tests passed. These cover newly saved CCS2 vehicles with an AC-first charger list, changing vehicles, unsupported connectors remaining visible, empty/inactive vehicles, maintenance chargers and valid/invalid customer/admin routes. The Atlas integration suite was rerun successfully: 13 test groups passed, with successful responses from all 37 API routes, including the updated map response-header assertions. The disposable Atlas test database was removed. Formatting and credential-leak checks passed. The refreshed glass styling is applied through shared CSS; a new visual browser pass has not been performed for this update.
+
+### Earlier browser verification
 
 Local isolated demo checked through the Codex browser: station listing, responsive navigation, admin login, vehicle creation, station details and Leaflet map, future slot selection, saved booking summary, successful simulated payment, admin start/complete transitions and matching report totals. The completed-booking review form was also verified on mobile. Desktop viewport: 1440×1000; mobile viewport: 390×844, with no horizontal page overflow. Customer registration and role separation are covered by the database-backed integration suite.
 
@@ -26,4 +32,4 @@ Evidence: [Desktop station finder](screenshots/station-finder-desktop.png), [mob
 
 ## Manual deployment checks
 
-Before deployment, configure a real Atlas URI and private secrets. Confirm the health endpoint, secure HTTPS session cookies, process restart persistence, host logging and backups. Real Atlas connectivity and hosted deployment require the user's environment and are not claimed as verified by local tests. Test geolocation permission denial in the target browser; manual city search remains available independently.
+Atlas authentication, ping and replica-set capability were verified using the private local configuration. The application database was seeded successfully. The separate normal server-start check was not executed because automatic approval review reached its usage limit. API tests did run the actual Express application with Atlas-backed records and sessions; this is distinct from validating a deployed host. Public hosting, HTTPS cookies, host logging and backups remain deployment tasks. The earlier UI screenshots use the isolated local demo, not Atlas. Test geolocation permission denial in the target browser; manual city search remains available independently.

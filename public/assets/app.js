@@ -12,6 +12,8 @@ import {
   badge,
 } from './api.js';
 import { renderAdmin } from './admin.js';
+import { selectChargingPair } from './booking-selection.js';
+import { resolveRoute } from './routes.js';
 const app = document.querySelector('#app');
 let user = null,
   configuration = {},
@@ -69,11 +71,36 @@ function mountMap(stations) {
     map = null;
   }
   map = L.map(el, { scrollWheelZoom: false }).setView([22.5, 72.9], 8);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  const currentMap = map;
+  el.querySelector('.map-unavailable')?.remove();
+  const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
+    referrerPolicy: 'strict-origin-when-cross-origin',
     attribution:
       '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-  }).addTo(map);
+  });
+  tiles.once('tileerror', () => {
+    if (map !== currentMap || !el.isConnected) return;
+    currentMap.removeLayer(tiles);
+    const notice = document.createElement('div');
+    notice.className = 'map-unavailable';
+    notice.setAttribute('role', 'status');
+    const message = document.createElement('p');
+    message.textContent = 'Map tiles are unavailable. Station addresses and booking still work.';
+    notice.append(message);
+    const link = document.createElement('a');
+    const coordinates = stations[0]?.location.coordinates;
+    link.href = coordinates
+      ? `https://www.openstreetmap.org/?mlat=${coordinates[1]}&mlon=${coordinates[0]}#map=15/${coordinates[1]}/${coordinates[0]}`
+      : 'https://www.openstreetmap.org/';
+    link.textContent = 'Open OpenStreetMap ↗';
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    notice.append(link);
+    L.DomEvent.disableClickPropagation(notice);
+    el.append(notice);
+  });
+  tiles.addTo(currentMap);
   const bounds = [];
   for (const s of stations) {
     const [lng, lat] = s.location.coordinates;
@@ -189,23 +216,75 @@ async function stationPage(id) {
     String(configuration.blockMinutes * 2),
   )}<label>Available start times</label><div id="slots" class="slots"></div>${
     user
-      ? select(
-          'Your vehicle',
-          'vehicle',
-          vehicles
-            .filter((v) => v.isActive)
-            .map((v) => [
-              v._id,
-              `${v.manufacturer} ${v.model} · ${v.registrationNumber} (${v.connectorType})`,
-            ]),
-        )
+      ? '<div id="vehicle-picker" aria-live="polite"></div>'
       : '<p class="notice">Sign in to reserve your charging session.</p>'
-  }${user && !vehicles.some((v) => v.isActive) ? '<p class="notice">Add a vehicle before booking. <a href="#/vehicles">Go to My vehicles →</a></p>' : ''}<div class="summary-row total"><span>Estimated total</span><strong id="estimate">—</strong></div><p class="small-text mt-3">A ${configuration.holdMinutes}-minute hold protects your slot during demo payment. Free cancellation before your session starts.</p><button class="button w-100" type="submit">${user ? 'Continue to booking summary' : 'Sign in to book'} →</button></form></section></div></div>`;
+  }<div class="summary-row total"><span>Estimated total</span><strong id="estimate">—</strong></div><p class="small-text mt-3">A ${configuration.holdMinutes}-minute hold protects your slot during demo payment. Free cancellation before your session starts.</p><button class="button w-100" type="submit">${user ? 'Continue to booking summary' : 'Sign in to book'} →</button></form></section></div></div>`;
   mountMap([s]);
   let selected = null,
     slots = [];
   let availabilityRequest = 0;
   const form = document.querySelector('#slot-form');
+  const selectionStatus = document.createElement('p');
+  selectionStatus.className = 'notice';
+  selectionStatus.id = 'selection-status';
+  selectionStatus.setAttribute('role', 'status');
+  form.querySelector('[type="submit"]').before(selectionStatus);
+  const activeVehicles = vehicles.filter((vehicle) => vehicle.isActive);
+  const initialPair = selectChargingPair(
+    vehicles,
+    s.chargers,
+    sessionStorage.getItem('lastSavedVehicle'),
+  );
+  if (initialPair.charger) form.charger.value = initialPair.charger._id;
+  function updateBookingButton() {
+    const vehicle = activeVehicles.find((item) => item._id === form.elements.vehicle?.value);
+    const charger = s.chargers.find((item) => item._id === form.charger.value);
+    form.querySelector('[type="submit"]').disabled =
+      Boolean(user) && (!vehicle || !charger || vehicle.connectorType !== charger.connectorType);
+    selectionStatus.textContent = selected
+      ? `Selected: ${dateTime(selected.startAt, s.timeZone)} · ${form.duration.value} minutes. Ready to continue.`
+      : 'Choose a start time above. Green slots are available; your selected slot will turn orange.';
+  }
+  function drawVehicles() {
+    if (!user) return;
+    const charger = s.chargers.find((item) => item._id === form.charger.value);
+    const holder = document.querySelector('#vehicle-picker');
+    const previous = form.elements.vehicle?.value || initialPair.vehicle?._id;
+    const selectedVehicle = activeVehicles.find((item) => item._id === previous);
+    const matches = selectedVehicle?.connectorType === charger?.connectorType;
+    holder.innerHTML = activeVehicles.length
+      ? `${select(
+          'Your vehicle',
+          'vehicle',
+          activeVehicles.map((vehicle) => [
+            vehicle._id,
+            `${vehicle.manufacturer} ${vehicle.model} · ${vehicle.registrationNumber} (${vehicle.connectorType})`,
+          ]),
+          previous || activeVehicles[0]._id,
+        )}<p class="small-text ${matches ? 'muted' : 'notice'}">${matches ? 'Your vehicle is compatible with this charger.' : `Your vehicle uses ${e(selectedVehicle?.connectorType)}. Select a matching charger to continue.`} <a href="#/vehicles" class="add-booking-vehicle">Manage vehicles →</a></p>`
+      : `<div class="vehicle-empty"><strong>${activeVehicles.length ? 'No compatible vehicle' : 'Add your first vehicle'}</strong><p>${activeVehicles.length ? `This charger uses ${e(charger?.connectorType || 'an unavailable connector')}. Choose another charger or add a matching vehicle.` : 'Save your EV to select it here and reserve your charging slot.'}</p><a href="#/vehicles" class="button secondary add-booking-vehicle">+ Add a vehicle</a></div>`;
+    holder
+      .querySelectorAll('.add-booking-vehicle')
+      .forEach((link) =>
+        link.addEventListener('click', () =>
+          sessionStorage.setItem('vehicleReturnTo', `#/station/${id}`),
+        ),
+      );
+    if (form.elements.vehicle)
+      form.elements.vehicle.onchange = () => {
+        const pair = selectChargingPair(
+          vehicles,
+          s.chargers,
+          form.elements.vehicle.value,
+          form.charger.value,
+        );
+        if (pair.charger) form.charger.value = pair.charger._id;
+        drawVehicles();
+        loadSlots();
+      };
+    updateBookingButton();
+  }
+  drawVehicles();
   form.date.min = dateInZone(new Date(), s.timeZone);
   form.date.max = dateInZone(
     new Date(Date.now() + configuration.horizonDays * 86400000),
@@ -215,6 +294,7 @@ async function stationPage(id) {
     const request = ++availabilityRequest;
     selected = null;
     slots = [];
+    updateBookingButton();
     const holder = document.querySelector('#slots');
     holder.innerHTML = '<small class="muted">Loading slots…</small>';
     if (!form.charger.value) {
@@ -234,32 +314,57 @@ async function stationPage(id) {
   }
   function drawSlots() {
     selected = null;
+    updateBookingButton();
     const duration = Number(form.duration.value),
       required = duration / configuration.blockMinutes;
     document.querySelector('#slots').innerHTML = slots
       .map((slot, i) => {
         const segment = slots.slice(i, i + required);
         const available = segment.length === required && segment.every((x) => x.available);
-        return `<button type="button" class="slot" data-index="${i}" ${available ? '' : 'disabled'}>${slot.label}</button>`;
+        return `<button type="button" class="slot" aria-pressed="false" data-index="${i}" ${available ? '' : 'disabled'}>${slot.label}</button>`;
       })
       .join('');
     document.querySelectorAll('.slot').forEach(
       (btn) =>
         (btn.onclick = () => {
           selected = slots[Number(btn.dataset.index)];
-          document.querySelectorAll('.slot').forEach((x) => x.classList.remove('selected'));
+          document.querySelectorAll('.slot').forEach((x) => {
+            x.classList.remove('selected');
+            x.setAttribute('aria-pressed', 'false');
+          });
           btn.classList.add('selected');
+          btn.setAttribute('aria-pressed', 'true');
+          updateBookingButton();
         }),
     );
     const c = s.chargers.find((c) => c._id === form.charger.value);
-    document.querySelector('#estimate').textContent = money((c.pricePerHourPaise * duration) / 60);
+    document.querySelector('#estimate').textContent = c
+      ? money((c.pricePerHourPaise * duration) / 60)
+      : '—';
+    if (!document.querySelector('.slot:not(:disabled)')) {
+      selectionStatus.textContent =
+        'No available start times for this date and duration. Choose another date or a shorter duration.';
+    }
   }
-  form.charger.onchange = loadSlots;
+  form.charger.onchange = () => {
+    drawVehicles();
+    loadSlots();
+  };
   form.date.onchange = loadSlots;
   form.duration.onchange = drawSlots;
   bindForm('slot-form', async (data) => {
     if (!requireUser()) return;
-    if (!selected) throw new Error('Choose an available start time.');
+    if (!selected) {
+      const available = form.querySelector('.slot:not(:disabled)');
+      const target = available || form.date;
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      target.focus({ preventScroll: true });
+      throw new Error(
+        available
+          ? 'Select a green start time, then continue. Your selected time will turn orange.'
+          : 'No slots are available. Choose another date or a shorter duration.',
+      );
+    }
     if (!data.vehicle) throw new Error('Add an active vehicle first.');
     const booking = await api('/api/bookings', 'POST', {
       chargerId: data.charger,
@@ -390,8 +495,15 @@ async function vehiclesPage() {
     delete data.id;
     if (data.batteryCapacityKwh) data.batteryCapacityKwh = Number(data.batteryCapacityKwh);
     else delete data.batteryCapacityKwh;
-    await api('/api/vehicles' + (id ? `/${id}` : ''), id ? 'PATCH' : 'POST', data);
+    const saved = await api('/api/vehicles' + (id ? `/${id}` : ''), id ? 'PATCH' : 'POST', data);
+    sessionStorage.setItem('lastSavedVehicle', saved._id);
     toast('Vehicle saved.');
+    const returnTo = sessionStorage.getItem('vehicleReturnTo');
+    if (returnTo?.startsWith('#/station/')) {
+      sessionStorage.removeItem('vehicleReturnTo');
+      location.hash = returnTo;
+      return;
+    }
     await render();
   });
   document.querySelectorAll('.edit-vehicle').forEach(
@@ -470,8 +582,18 @@ async function render() {
   document.querySelector('.sidebar').classList.remove('open');
   navigation();
   app.innerHTML = '<div class="loading">Getting things ready…</div>';
-  const [, page = '', id = '', action = ''] = location.hash.split('/');
+  const route = resolveRoute(location.hash);
   try {
+    if (!route) {
+      app.innerHTML = `${heading('Page not found.', 'This link is incomplete or no longer exists.', button('Find a station →', '#/'))}`;
+      return;
+    }
+    const {
+      name: page,
+      params: [id = '', action = ''],
+    } = route;
+    if (route.protected && !requireUser()) return;
+    if (route.admin && user.role !== 'admin') throw new Error('Admin access required.');
     if (page === 'login' || page === 'register') await authPage(page === 'register');
     else if (page === 'station') await stationPage(id);
     else if (page === 'booking') await bookingPage(id);

@@ -2,6 +2,7 @@ export function config(env = process.env) {
   const cfg = {
     production: env.NODE_ENV === 'production',
     port: Number(env.PORT || 3000),
+    host: env.HOST || '127.0.0.1',
     mongoUri: env.MONGODB_URI,
     secret: env.SESSION_SECRET,
     baseUrl: env.APP_BASE_URL || 'http://localhost:3000',

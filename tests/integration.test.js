@@ -7,7 +7,28 @@ import { DateTime } from 'luxon';
 import { createApp } from '../src/app.js';
 import * as M from '../src/models/index.js';
 import { expireHolds } from '../src/services/booking.js';
+import { readFile, mkdir, writeFile } from 'node:fs/promises';
 let repl, app, customer, other, admin, station, charger, vehicle, csrf, otherCsrf, adminCsrf;
+let ownsTestDatabase = false;
+const atlasMode = process.env.TEST_DATABASE_MODE === 'atlas';
+const coverage = new Map();
+function instrumentApplication(application) {
+  const wrapped = (req, res) => {
+    res.on('finish', () => {
+      if (!req.route?.path) return;
+      const prefix =
+        req.originalUrl.startsWith('/api/admin/') && !req.route.path.startsWith('/api/')
+          ? '/api/admin'
+          : '';
+      const route = `${req.method} ${prefix}${req.route.path}`;
+      if (!coverage.has(route)) coverage.set(route, new Set());
+      coverage.get(route).add(res.statusCode);
+    });
+    application(req, res);
+  };
+  wrapped.locals = application.locals;
+  return wrapped;
+}
 const cfg = {
   secret: 'integration-test-secret-at-least-32-characters',
   holdMinutes: 5,
@@ -32,14 +53,37 @@ const post = (url, data, agent = customer, token = csrf) =>
   agent.post(url).set('X-CSRF-Token', token).send(data);
 before(
   async () => {
-    repl = await MongoMemoryReplSet.create({
-      replSet: { count: 1 },
-      binary: { version: '7.0.14' },
-    });
-    cfg.mongoUri = repl.getUri();
-    await mongoose.connect(cfg.mongoUri);
+    if (atlasMode) {
+      const name = process.env.TEST_DATABASE_NAME;
+      assert.match(name || '', /^voltway_test_[a-f0-9]{24}$/);
+      const uri = new URL(process.env.TEST_MONGODB_URI);
+      assert.equal(uri.pathname, `/${name}`);
+      cfg.mongoUri = uri.toString();
+    } else {
+      repl = await MongoMemoryReplSet.create({
+        replSet: { count: 1 },
+        binary: { version: '7.0.14' },
+      });
+      cfg.mongoUri = repl.getUri();
+    }
+    try {
+      await mongoose.connect(cfg.mongoUri, { serverSelectionTimeoutMS: 15000 });
+    } catch {
+      throw new Error(
+        'Test database connection failed. Check private configuration and Atlas access.',
+      );
+    }
+    if (atlasMode) {
+      assert.equal(mongoose.connection.name, process.env.TEST_DATABASE_NAME);
+      assert.equal(
+        (await mongoose.connection.db.listCollections().toArray()).length,
+        0,
+        'Refusing to modify an existing test database',
+      );
+      ownsTestDatabase = true;
+    }
     await M.initializeModels();
-    app = createApp(cfg);
+    app = instrumentApplication(createApp(cfg));
     customer = request.agent(app);
     other = request.agent(app);
     admin = request.agent(app);
@@ -100,9 +144,33 @@ before(
   { timeout: 180000 },
 );
 after(async () => {
-  if (app) await app.locals.sessionStore.close();
-  await mongoose.disconnect();
-  if (repl) await repl.stop();
+  try {
+    if (app) await app.locals.sessionStore.close();
+    if (atlasMode && ownsTestDatabase) {
+      assert.equal(mongoose.connection.name, process.env.TEST_DATABASE_NAME);
+      assert.match(mongoose.connection.name, /^voltway_test_[a-f0-9]{24}$/);
+      await mongoose.connection.dropDatabase();
+      console.log('Isolated Atlas test database removed; application database was not touched.');
+    }
+  } finally {
+    await mongoose.disconnect();
+    if (repl) await repl.stop();
+    await mkdir('test-results', { recursive: true });
+    await writeFile(
+      `test-results/api-coverage-${atlasMode ? 'atlas' : 'local'}.json`,
+      JSON.stringify(
+        {
+          mode: atlasMode ? 'atlas' : 'local',
+          checkedAt: new Date().toISOString(),
+          routes: [...coverage]
+            .sort()
+            .map(([route, statuses]) => ({ route, statuses: [...statuses].sort() })),
+        },
+        null,
+        2,
+      ),
+    );
+  }
 });
 test('authentication, CSRF, ownership and roles are enforced', async () => {
   assert.equal((await customer.get('/api/admin/users')).status, 403);
@@ -303,4 +371,157 @@ test('invalid durations, horizon, station status, incompatible vehicles and tran
     (await customer.get('/api/chargers/not-an-id/availability?date=2026-10-10')).status,
     400,
   );
+});
+
+test('remaining customer APIs: details, vehicle editing/deactivation, notifications, and logout', async () => {
+  assert.equal((await customer.get('/api/health')).body.status, 'ok');
+  assert.equal((await customer.get('/api/auth/me')).body.user.role, 'customer');
+  const list = await customer.get('/api/vehicles');
+  assert.equal(list.status, 200);
+  assert.ok(list.body.some((v) => v._id === vehicle._id));
+  const edited = await customer
+    .patch(`/api/vehicles/${vehicle._id}`)
+    .set('X-CSRF-Token', csrf)
+    .send({ model: 'Nexon Updated' });
+  assert.equal(edited.status, 200);
+  assert.equal(edited.body.model, 'Nexon Updated');
+  const details = await customer.get(`/api/stations/${station._id}`);
+  assert.equal(details.status, 200);
+  assert.equal(details.body.chargers.length, 1);
+  const reviews = await customer.get(`/api/stations/${station._id}/reviews`);
+  assert.equal(reviews.status, 200);
+  assert.equal(reviews.body.length, 1);
+  assert.equal('passwordHash' in reviews.body[0].userId, false);
+  const bookings = await customer.get('/api/bookings');
+  assert.equal(bookings.status, 200);
+  const completed = bookings.body.find((b) => b.status === 'completed');
+  const booking = await customer.get(`/api/bookings/${completed._id}`);
+  assert.equal(booking.status, 200);
+  assert.equal(booking.body.payments[0].mode, 'simulated');
+  assert.equal(booking.body.review.rating, 5);
+  const notifications = await customer.get('/api/notifications');
+  const marked = await customer
+    .patch(`/api/notifications/${notifications.body[0]._id}/read`)
+    .set('X-CSRF-Token', csrf)
+    .send({});
+  assert.equal(marked.status, 200);
+  assert.ok(marked.body.readAt);
+  const removed = await customer.delete(`/api/vehicles/${vehicle._id}`).set('X-CSRF-Token', csrf);
+  assert.equal(removed.status, 200);
+  assert.equal(removed.body.isActive, false);
+  assert.equal(
+    (await customer.get(`/api/bookings/${completed._id}`)).body.vehicleSnapshot.model,
+    'Nexon',
+  );
+  const signedOut = request.agent(app);
+  const token = (await signedOut.get('/api/auth/csrf')).body.token;
+  const login = await post(
+    '/api/auth/login',
+    { email: 'driver@example.com', password: 'test-password-123' },
+    signedOut,
+    token,
+  );
+  assert.equal(login.status, 200);
+  assert.equal((await post('/api/auth/logout', {}, signedOut, login.body.csrf)).status, 200);
+  assert.equal((await signedOut.get('/api/auth/me')).body.user, null);
+  assert.equal((await signedOut.get('/api/bookings')).status, 401);
+});
+
+test('every admin read/update API returns consistent records and hides password hashes', async () => {
+  const stations = await admin.get('/api/admin/stations');
+  assert.equal(stations.status, 200);
+  assert.equal(stations.body.length, 1);
+  const changed = await admin
+    .patch(`/api/admin/stations/${station._id}`)
+    .set('X-CSRF-Token', adminCsrf)
+    .send({ description: 'Updated through admin API' });
+  assert.equal(changed.status, 200);
+  assert.equal(changed.body.description, 'Updated through admin API');
+  const chargers = await admin.get('/api/admin/chargers');
+  assert.equal(chargers.status, 200);
+  assert.equal(chargers.body[0].stationId.name, 'Test Station');
+  const price = await admin
+    .patch(`/api/admin/chargers/${charger._id}`)
+    .set('X-CSRF-Token', adminCsrf)
+    .send({ pricePerHourPaise: 15000 });
+  assert.equal(price.status, 200);
+  assert.equal(price.body.pricePerHourPaise, 15000);
+  const users = await admin.get('/api/admin/users');
+  assert.equal(users.status, 200);
+  assert.equal(users.body.length, 3);
+  assert.ok(users.body.every((u) => !('passwordHash' in u)));
+  const bookings = await admin.get('/api/admin/bookings?status=completed');
+  assert.equal(bookings.status, 200);
+  assert.equal(bookings.body.length, 1);
+  assert.equal(bookings.body[0].priceSnapshot.pricePerHourPaise, 12000);
+  const payments = await admin.get('/api/admin/payments');
+  assert.equal(payments.status, 200);
+  assert.equal(payments.body.refunds.length, 1);
+  const dashboard = await admin.get('/api/admin/dashboard');
+  assert.equal(dashboard.status, 200);
+  assert.equal(dashboard.body.customers, 2);
+  assert.equal(dashboard.body.completed, 1);
+  assert.equal(dashboard.body.grossPaise, 24000);
+  assert.equal(dashboard.body.refundPaise, 12000);
+  assert.equal(dashboard.body.netPaise, 12000);
+  const report = await admin.get(
+    `/api/admin/reports?from=${tomorrow.toISODate()}&to=${tomorrow.toISODate()}&stationId=${station._id}`,
+  );
+  assert.equal(report.status, 200);
+  assert.equal(report.body.grossPaise, dashboard.body.grossPaise);
+  const exported = await admin.get(
+    `/api/admin/reports/export?from=${tomorrow.toISODate()}&to=${tomorrow.toISODate()}&status=completed`,
+  );
+  assert.equal(exported.status, 200);
+  assert.equal(exported.text.split('\r\n').length, 2);
+});
+
+test('frontend assets are served, private files are inaccessible, and all declared routes are exercised', async () => {
+  for (const path of [
+    '/',
+    '/assets/app.js',
+    '/assets/admin.js',
+    '/assets/style.css',
+    '/vendor/leaflet/leaflet.js',
+    '/vendor/bootstrap/css/bootstrap.min.css',
+  ]) {
+    const response = await request(app).get(path);
+    assert.equal(response.status, 200, path);
+    assert.equal(response.headers['referrer-policy'], 'strict-origin-when-cross-origin');
+    assert.ok(
+      response.headers['content-security-policy'].includes('https://tile.openstreetmap.org'),
+    );
+    assert.equal(response.text.includes('mongodb+srv://'), false);
+  }
+  for (const path of ['/.env', '/.git/config', '/src/config.js', '/api/unknown'])
+    assert.equal((await request(app).get(path)).status, 404, path);
+  const source = await readFile(new URL('../src/app.js', import.meta.url), 'utf8');
+  const expected = [
+    ...source.matchAll(/route\(\s*(app|a),\s*'(get|post|patch|delete)',\s*'([^']+)'/g),
+  ].map(
+    ([, router, method, path]) =>
+      `${method.toUpperCase()} ${router === 'a' ? '/api/admin' : ''}${path}`,
+  );
+  for (const [, method, path] of source.matchAll(/app\.(get|post|patch|delete)\('([^']+)'/g))
+    expected.push(`${method.toUpperCase()} ${path}`);
+  for (const endpoint of expected) {
+    assert.ok(coverage.has(endpoint), `Missing coverage: ${endpoint}`);
+    assert.ok(
+      [...coverage.get(endpoint)].some((status) => status >= 200 && status < 300),
+      `No successful response: ${endpoint}`,
+    );
+  }
+  console.log(`Verified successful responses for all ${expected.length} declared API endpoints.`);
+});
+
+test('authentication rate limiting blocks repeated incorrect logins', async () => {
+  let response;
+  for (let attempt = 0; attempt < 32; attempt++) {
+    response = await post('/api/auth/login', {
+      email: 'driver@example.com',
+      password: 'incorrect',
+    });
+    if (response.status === 429) break;
+  }
+  assert.equal(response.status, 429);
 });

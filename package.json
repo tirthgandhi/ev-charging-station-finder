@@ -10,7 +10,10 @@
     "test": "node --test tests/*.test.js",
     "preview": "node scripts/preview.js",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "db:check": "node --env-file-if-exists=.env scripts/check-db.js",
+    "test:atlas": "node --env-file-if-exists=.env scripts/test-atlas.js",
+    "privacy:check": "node scripts/privacy-check.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",

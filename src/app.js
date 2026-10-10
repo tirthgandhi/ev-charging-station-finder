@@ -31,12 +31,14 @@ export function createApp(cfg) {
   if (cfg.production) app.set('trust proxy', 1);
   app.use(
     helmet({
+      // Tile providers require a browser Referer; send only our origin cross-site.
+      referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
           scriptSrc: ["'self'"],
           styleSrc: ["'self'", "'unsafe-inline'"],
-          imgSrc: ["'self'", 'data:', 'https://*.tile.openstreetmap.org'],
+          imgSrc: ["'self'", 'data:', 'https://tile.openstreetmap.org'],
           connectSrc: ["'self'"],
           upgradeInsecureRequests: cfg.production ? [] : null,
         },

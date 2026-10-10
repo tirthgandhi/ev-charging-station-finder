@@ -1257,9 +1257,109 @@ label {
     margin-top: 5px;
   }
 }
+.map-unavailable {
+  position: absolute;
+  z-index: 800;
+  left: 18px;
+  right: 18px;
+  bottom: 32px;
+  padding: 16px;
+  border: 1px solid rgba(255, 138, 66, 0.3);
+  border-radius: 12px;
+  background: #1b1c18;
+  color: var(--text);
+}
+.map-unavailable p {
+  margin: 0 0 8px;
+  font-size: 12px;
+}
+.map-unavailable a {
+  color: var(--orange);
+  font-size: 12px;
+}
+.vehicle-empty {
+  padding: 18px;
+  margin: 16px 0 22px;
+  border: 1px solid rgba(255, 138, 66, 0.25);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(255, 138, 66, 0.08), rgba(255, 255, 255, 0.02));
+}
+.vehicle-empty strong {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+.vehicle-empty p {
+  font-size: 12px;
+  margin-bottom: 14px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* Shared glass surfaces across customer, authentication and admin pages. */
+body {
+  background:
+    radial-gradient(ellipse at 85% 5%, #783b202e, transparent 45%),
+    radial-gradient(ellipse at 15% 80%, #6c3c201a, transparent 50%), #101110;
+  background-attachment: fixed;
+}
+.panel,
+.station-card,
+.booking-row,
+.stat,
+.auth-layout,
+.vehicle-empty {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.065),
+    rgba(255, 138, 66, 0.025) 50%,
+    rgba(22, 23, 21, 0.78)
+  );
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.065),
+    0 12px 35px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(22px) saturate(130%);
+  -webkit-backdrop-filter: blur(22px) saturate(130%);
+}
+.topbar,
+.sidebar {
+  background: rgba(19, 20, 18, 0.74);
+  backdrop-filter: blur(26px) saturate(140%);
+  -webkit-backdrop-filter: blur(26px) saturate(140%);
+}
+input,
+select,
+textarea {
+  background: rgba(12, 14, 12, 0.58) !important;
+  border-color: rgba(255, 255, 255, 0.16) !important;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.16);
+}
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--orange) !important;
+  outline: 2px solid rgba(255, 138, 66, 0.15);
+}
+select option {
+  background: #20231e;
+  color: #f0f1e9;
+}
+.data-table tbody tr:hover {
+  background: rgba(255, 138, 66, 0.045);
+}
+@supports not (backdrop-filter: blur(1px)) {
+  .panel,
+  .station-card,
+  .booking-row,
+  .stat,
+  .auth-layout,
+  .vehicle-empty {
+    background: #20221e;
   }
 }

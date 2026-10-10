@@ -15,7 +15,9 @@ const timer = setInterval(
 );
 timer.unref();
 const app = createApp(cfg);
-const server = app.listen(cfg.port, () => console.log(`EV charging application: ${cfg.baseUrl}`));
+const server = app.listen(cfg.port, cfg.host, () =>
+  console.log(`EV charging application: ${cfg.baseUrl}`),
+);
 for (const signal of ['SIGINT', 'SIGTERM'])
   process.on(signal, () => {
     clearInterval(timer);
