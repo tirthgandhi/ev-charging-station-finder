@@ -4,7 +4,12 @@ import { parse } from 'dotenv';
 
 // Scan only deliverable source. The private .env is read in memory, never printed.
 const environment = parse(await readFile('.env', 'utf8').catch(() => ''));
-const secrets = [environment.MONGODB_URI, environment.SESSION_SECRET, environment.ADMIN_PASSWORD];
+const secrets = [
+  environment.MONGODB_URI,
+  environment.SESSION_SECRET,
+  environment.ADMIN_EMAIL,
+  environment.ADMIN_PASSWORD,
+];
 if (environment.MONGODB_URI) {
   const uri = new URL(environment.MONGODB_URI);
   secrets.push(uri.username, decodeURIComponent(uri.password), uri.hostname);
@@ -17,6 +22,8 @@ const roots = [
   'tests',
   'docs',
   'README.md',
+  'SETUP.md',
+  'compose.yaml',
   'package.json',
   'package-lock.json',
   '.env.example',

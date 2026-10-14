@@ -89,6 +89,8 @@ _Screenshots show the earlier isolated demo. Vehicle selection and shared glass 
 
 ## 🚀 Quick Start
 
+For a complete local installation or a handoff to any AI coding assistant, follow **[SETUP.md](SETUP.md)**. It includes a persistent local MongoDB replica set, frontend/backend startup, verification, and troubleshooting. Owner credentials are supplied separately and are not included in that guide.
+
 ### 1. Clone and install
 
 ```bash

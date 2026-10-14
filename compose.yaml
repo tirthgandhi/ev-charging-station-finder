@@ -1,0 +1,51 @@
+# Local development only. The Node application runs on the host computer.
+services:
+  mongodb:
+    image: mongo:7.0.14
+    command: [mongod, --replSet, rs0, --bind_ip_all]
+    ports:
+      - '127.0.0.1:27017:27017'
+    volumes:
+      - voltway_mongodb:/data/db
+    healthcheck:
+      test:
+        - CMD
+        - mongosh
+        - --quiet
+        - --eval
+        - >-
+          try {
+            quit(db.adminCommand({ping: 1}).ok === 1 ? 0 : 1);
+          } catch (e) { quit(1); }
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+  mongodb-init:
+    image: mongo:7.0.14
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    # Share MongoDB's network so the same loopback replica address works from
+    # mongosh inside the container and from Node on the host via the published port.
+    network_mode: service:mongodb
+    entrypoint: [mongosh, --host, '127.0.0.1:27017', --quiet, --eval]
+    command:
+      - >-
+        for (let attempt = 0; attempt < 60; attempt++) {
+          try {
+            try { rs.status(); }
+            catch (e) {
+              if (e.code !== 94) throw e;
+              rs.initiate({_id: 'rs0', members: [{_id: 0, host: '127.0.0.1:27017'}]});
+            }
+            if (db.hello().isWritablePrimary) quit(0);
+          } catch (e) {
+            if (attempt === 59) throw e;
+          }
+          sleep(1000);
+        }
+        throw new Error('MongoDB replica set did not become writable');
+    restart: 'no'
+volumes:
+  voltway_mongodb:

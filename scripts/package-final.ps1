@@ -7,7 +7,7 @@ try {
     & node scripts/privacy-check.js
     if ($LASTEXITCODE -ne 0) { throw 'Privacy check failed. Archive was not created.' }
     Add-Type -AssemblyName System.IO.Compression
-    $roots = @('src', 'public', 'scripts', 'tests', 'docs', 'README.md', 'package.json', 'package-lock.json', '.env.example', '.gitignore', '.prettierrc.json', '.prettierignore')
+    $roots = @('src', 'public', 'scripts', 'tests', 'docs', 'README.md', 'SETUP.md', 'compose.yaml', 'package.json', 'package-lock.json', '.env.example', '.gitignore', '.prettierrc.json', '.prettierignore')
     $files = foreach ($root in $roots) {
         $item = Get-Item -LiteralPath (Join-Path $projectRoot $root)
         if ($item.PSIsContainer) { Get-ChildItem -LiteralPath $item.FullName -File -Recurse } else { $item }
